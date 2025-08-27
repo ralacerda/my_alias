@@ -1,4 +1,5 @@
 import envoy
+import gleam/int
 import gleam/io
 import gleam/list
 import gleam/result
@@ -7,13 +8,18 @@ import gleam_community/ansi
 import simplifile
 
 pub fn main() {
-  get_zshrc_path()
-  |> read_zshrc
-  |> string.split("\n")
-  |> list.filter(fn(x) { string.starts_with(x, "alias") })
-  |> list.map(format_alias)
-  |> string.join("\n")
-  |> io.println
+  let #(valid_aliases, error_aliases) =
+    get_zshrc_path()
+    |> read_zshrc
+    |> string.split("\n")
+    |> list.filter(fn(x) { string.starts_with(x, "alias") })
+    |> format_alias_list
+
+  valid_aliases |> list.each(io.println)
+
+  io.println("")
+  use error_alias <- list.each(error_aliases)
+  io.println_error(ansi.red("Invalid alias: ") <> error_alias)
 }
 
 fn get_zshrc_path() {
@@ -37,12 +43,26 @@ type AliasPair {
   AliasPair(alias: String, command: String)
 }
 
-fn format_alias(line: String) -> String {
-  line
-  |> extract_pair()
-  |> result.map(colored_output)
-  |> result.map_error(fn(x) { "Problem with alias: " <> x })
-  |> result.unwrap_both
+fn format_alias_list(aliases: List(String)) -> #(List(String), List(String)) {
+  let pairs = list.map(aliases, extract_pair)
+
+  let #(valid_pairs, error_pairs) = result.partition(pairs)
+
+  let assert Ok(larger_name) =
+    valid_pairs
+    |> list.map(fn(x) { string.length(x.alias) })
+    |> list.max(int.compare)
+
+  let formatted_alias =
+    valid_pairs |> list.map(fn(x) { format_alias(x, larger_name) })
+
+  #(formatted_alias, error_pairs)
+}
+
+fn format_alias(pair: AliasPair, minimal_size: Int) -> String {
+  pair
+  |> fn(x) { AliasPair(..x, alias: string.pad_end(x.alias, minimal_size, " ")) }
+  |> colored_output
 }
 
 fn extract_pair(line: String) -> Result(AliasPair, String) {
