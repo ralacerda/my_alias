@@ -12,7 +12,7 @@ pub fn main() {
     get_zshrc_path()
     |> read_zshrc
     |> string.split("\n")
-    |> list.filter(fn(x) { string.starts_with(x, "alias") })
+    |> list.filter(string.starts_with(_, "alias"))
     |> format_alias_list
 
   valid_aliases |> list.each(io.println)
@@ -53,8 +53,7 @@ fn format_alias_list(aliases: List(String)) -> #(List(String), List(String)) {
     |> list.map(fn(x) { string.length(x.alias) })
     |> list.max(int.compare)
 
-  let formatted_alias =
-    valid_pairs |> list.map(fn(x) { format_alias(x, larger_name) })
+  let formatted_alias = valid_pairs |> list.map(format_alias(_, larger_name))
 
   #(formatted_alias, error_pairs)
 }
