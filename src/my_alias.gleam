@@ -59,8 +59,7 @@ fn format_alias_list(aliases: List(String)) -> #(List(String), List(String)) {
 }
 
 fn format_alias(pair: AliasPair, minimal_size: Int) -> String {
-  pair
-  |> fn(x) { AliasPair(..x, alias: string.pad_end(x.alias, minimal_size, " ")) }
+  AliasPair(..pair, alias: string.pad_end(pair.alias, minimal_size, " "))
   |> colored_output
 }
 
