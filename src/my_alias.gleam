@@ -70,12 +70,8 @@ fn extract_pair(line: String) -> Result(AliasPair, String) {
   case
     string.drop_start(line, string.length(prefix)) |> string.split_once("=")
   {
-    Ok(#(name, command)) -> {
-      Ok(AliasPair(name, drop_both(command)))
-    }
-    _ -> {
-      Error(line)
-    }
+    Ok(#(name, command)) -> Ok(AliasPair(name, drop_both(command)))
+    _ -> Error(line)
   }
 }
 
