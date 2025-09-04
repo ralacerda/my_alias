@@ -10,7 +10,7 @@ import simplifile
 pub fn main() {
   let #(valid_aliases, error_aliases) =
     get_zshrc_path()
-    |> read_zshrc
+    |> read_file_content
     |> string.split("\n")
     |> list.filter(string.starts_with(_, "alias"))
     |> format_alias_list
@@ -29,7 +29,7 @@ fn get_zshrc_path() {
   }
 }
 
-fn read_zshrc(path: String) {
+fn read_file_content(path: String) {
   case simplifile.read(path) {
     Ok(content) -> content
     Error(e) -> {
@@ -39,36 +39,37 @@ fn read_zshrc(path: String) {
   }
 }
 
-type AliasPair {
-  AliasPair(alias: String, command: String)
+type Alias {
+  Alias(name: String, command: String)
 }
 
 fn format_alias_list(aliases: List(String)) -> #(List(String), List(String)) {
-  let pairs = list.map(aliases, extract_pair)
+  let parsed_aliases = list.map(aliases, parse_alias)
 
-  let #(valid_pairs, error_pairs) = result.partition(pairs)
+  let #(valid_aliases, error_aliases) = result.partition(parsed_aliases)
 
-  let assert Ok(larger_name) =
-    valid_pairs
-    |> list.map(fn(x) { string.length(x.alias) })
+  let assert Ok(max_name_length) =
+    valid_aliases
+    |> list.map(fn(x) { string.length(x.name) })
     |> list.max(int.compare)
 
-  let formatted_alias = valid_pairs |> list.map(format_alias(_, larger_name))
+  let formatted_aliases =
+    valid_aliases |> list.map(format_alias(_, max_name_length))
 
-  #(formatted_alias, error_pairs)
+  #(formatted_aliases, error_aliases)
 }
 
-fn format_alias(pair: AliasPair, minimal_size: Int) -> String {
-  AliasPair(..pair, alias: string.pad_end(pair.alias, minimal_size, " "))
-  |> colored_output
+fn format_alias(alias: Alias, padding_width: Int) -> String {
+  Alias(..alias, name: string.pad_end(alias.name, padding_width, " "))
+  |> format_alias_with_color
 }
 
-fn extract_pair(line: String) -> Result(AliasPair, String) {
+fn parse_alias(line: String) -> Result(Alias, String) {
   let prefix = "alias "
   case
     string.drop_start(line, string.length(prefix)) |> string.split_once("=")
   {
-    Ok(#(name, command)) -> Ok(AliasPair(name, drop_both(command)))
+    Ok(#(name, command)) -> Ok(Alias(name, drop_both(command)))
     _ -> Error(line)
   }
 }
@@ -79,6 +80,6 @@ fn drop_both(input: String) -> String {
   |> string.drop_end(1)
 }
 
-fn colored_output(pair: AliasPair) -> String {
-  ansi.green(pair.alias) <> ": " <> ansi.blue(pair.command)
+fn format_alias_with_color(alias: Alias) -> String {
+  ansi.green(alias.name) <> ": " <> ansi.blue(alias.command)
 }
