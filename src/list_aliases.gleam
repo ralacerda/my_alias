@@ -4,40 +4,43 @@ import gleam/io
 import gleam/list
 import gleam/result
 import gleam/string
-import gleam_community/ansi
 import list_aliases/alias
 import simplifile
 
 pub fn main() {
-  let #(valid_aliases, error_aliases) =
-    get_zshrc_path()
-    |> read_file_content
+  let aliases = {
+    use zshrc_path <- result.try(get_zshrc_path())
+    use file_content <- result.map(read_file_content(zshrc_path))
+
+    file_content
     |> string.split("\n")
     |> list.filter(string.starts_with(_, "alias"))
+    // TODO: Partition should not be done inside format_alias_list
     |> format_alias_list
-
-  valid_aliases |> list.each(io.println)
-
-  io.println("")
-  use error_alias <- list.each(error_aliases)
-  io.println_error(ansi.red("Invalid alias: ") <> error_alias)
-}
-
-fn get_zshrc_path() {
-  case envoy.get("HOME") {
-    Ok(home) -> home <> "/.zshrc"
-    Error(_) -> panic as "Cannot read HOME variable"
   }
-}
 
-fn read_file_content(path: String) {
-  case simplifile.read(path) {
-    Ok(content) -> content
-    Error(e) -> {
-      let error = "Error reading .zshrc file: " <> simplifile.describe_error(e)
-      panic as error
+  case aliases {
+    Ok(#(formatted_aliases, error_aliases)) -> {
+      list.each(formatted_aliases, io.println)
+      list.each(error_aliases, fn(e) {
+        io.println_error("Error parsing: " <> e)
+      })
     }
+    Error(e) -> io.println_error(e)
   }
+}
+
+fn get_zshrc_path() -> Result(String, String) {
+  case envoy.get("HOME") {
+    Ok(home) -> Ok(home <> "/.zshrc")
+    Error(_) -> Error("Cannot read HOME variable")
+  }
+}
+
+fn read_file_content(path: String) -> Result(String, String) {
+  result.map_error(simplifile.read(path), fn(e) {
+    "Error reading .zshrc file: " <> simplifile.describe_error(e)
+  })
 }
 
 fn format_alias_list(lines: List(String)) -> #(List(String), List(String)) {
