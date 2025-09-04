@@ -4,7 +4,7 @@ import gleam/io
 import gleam/list
 import gleam/result
 import gleam/string
-import list_aliases/alias
+import list_aliases/alias.{type Alias}
 import simplifile
 
 pub fn main() {
@@ -15,13 +15,13 @@ pub fn main() {
     file_content
     |> string.split("\n")
     |> list.filter(string.starts_with(_, "alias"))
-    // TODO: Partition should not be done inside format_alias_list
-    |> format_alias_list
+    |> list.map(alias.from_string)
+    |> result.partition
   }
 
   case aliases {
-    Ok(#(formatted_aliases, error_aliases)) -> {
-      list.each(formatted_aliases, io.println)
+    Ok(#(valid_aliases, error_aliases)) -> {
+      valid_aliases |> format_alias_list |> list.each(io.println)
       list.each(error_aliases, fn(e) {
         io.println_error("Error parsing: " <> e)
       })
@@ -43,18 +43,13 @@ fn read_file_content(path: String) -> Result(String, String) {
   })
 }
 
-fn format_alias_list(lines: List(String)) -> #(List(String), List(String)) {
-  let parsed_aliases = list.map(lines, alias.from_string)
-
-  let #(valid_aliases, error_aliases) = result.partition(parsed_aliases)
-
-  let assert Ok(max_name_length) =
-    valid_aliases
+fn format_alias_list(aliases: List(Alias)) -> List(String) {
+  let max_name_length =
+    aliases
     |> list.map(fn(x) { string.length(x.name) })
     |> list.max(int.compare)
+    |> result.replace_error(0)
+    |> result.unwrap_both
 
-  let formatted_aliases =
-    valid_aliases |> list.map(alias.to_display_string(_, max_name_length))
-
-  #(formatted_aliases, error_aliases)
+  list.map(aliases, alias.to_display_string(_, max_name_length))
 }
